@@ -1,0 +1,38 @@
+# Test Dependencies
+
+# Testing Framework
+pytest==7.4.2
+pytest-cov==4.1.0
+pytest-timeout==2.1.0
+pytest-asyncio==0.21.1
+pytest-xdist==3.4.0  # Parallel testing
+
+# Mocking & Fixtures
+pytest-mock==3.12.0
+
+# HTTP Testing
+requests==2.31.0
+httpx==0.25.0
+
+# API Testing
+fastapi-testclient==0.1.0
+
+# Database & Storage (for tests)
+redis==5.0.1
+confluent-kafka==2.3.0
+
+# Code Quality
+black==23.12.0
+flake8==6.1.0
+isort==5.13.2
+mypy==1.7.1
+
+# Coverage
+coverage==7.3.2
+
+# Documentation
+pytest-html==4.1.1
+
+# Utilities
+faker==21.0.0  # Generate test data
+hypothesis==6.88.1  # Property-based testing

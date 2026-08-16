@@ -1,0 +1,75 @@
+groups:
+  - name: dpo_pipeline
+    interval: 30s
+    rules:
+      # API Availability
+      - alert: APIDown
+        expr: up{job="fastapi"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FastAPI is down"
+          description: "FastAPI service is not responding to health checks"
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          (rate(http_requests_total{status=~"5.."}[5m]) /
+           rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for 5 minutes"
+
+      # High Latency
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, http_request_duration_seconds_bucket) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency"
+          description: "P95 latency is above 2 seconds"
+
+      # Kafka Issues
+      - alert: KafkaDown
+        expr: up{job="kafka"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka broker is down"
+          description: "Kafka is not responding"
+
+      # Redis Issues
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis is not responding to health checks"
+
+      # MLflow Issues
+      - alert: MLflowDown
+        expr: up{job="mlflow"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MLflow is down"
+          description: "MLflow tracking server is not responding"
+
+      # Model Inference Latency
+      - alert: SlowInference
+        expr: histogram_quantile(0.95, model_inference_duration_seconds_bucket) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow model inference"
+          description: "P95 inference latency is above 5 seconds"
