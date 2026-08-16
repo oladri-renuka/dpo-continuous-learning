@@ -1,8 +1,7 @@
 """Core ML pipeline components."""
 
-from src.core.quality_gate import QualityGate, ModelDegradationError
+from src.core.quality_gate import QualityGate
 
 __all__ = [
     "QualityGate",
-    "ModelDegradationError",
 ]
