@@ -5,6 +5,7 @@ import sys
 import torch
 from datetime import datetime
 from typing import Dict, Any, Tuple
+import os
 
 import structlog
 from transformers import (
@@ -35,7 +36,8 @@ class DPOTrainingPipeline:
         from src.infra.s3_client import S3Client
         from src.infra.mlflow_client import MLflowClient
 
-        self.s3_client = S3Client()
+        bucket = os.getenv("S3_BUCKET", "dpo-ml-artifacts")
+        self.s3_client = S3Client(bucket=bucket)
         self.mlflow_client = MLflowClient()
 
     def train(self) -> Dict[str, Any]:
