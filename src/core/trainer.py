@@ -11,8 +11,6 @@ import structlog
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    Trainer,
-    TrainingArguments,
 )
 from peft import LoraConfig, get_peft_model
 from trl import DPOTrainer, DPOConfig
@@ -167,8 +165,7 @@ class DPOTrainingPipeline:
             model=model,
             args=training_args,
             train_dataset=train_dataset,
-            tokenizer=tokenizer,
-            peft_config=lora_config,
+            processing_class=tokenizer,
         )
 
         log.info("Starting DPO training...")
