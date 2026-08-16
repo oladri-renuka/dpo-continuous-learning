@@ -74,8 +74,8 @@ def generate_synthetic_data() -> List[Dict[str, str]]:
 
     examples = []
 
-    # Generate 300 examples (270 train, 30 val)
-    for i in range(300):
+    # Generate 5000 examples (4500 train, 500 val)
+    for i in range(5000):
         qa = qa_pairs[i % len(qa_pairs)]
 
         prompt = f"Q: What is {qa['topic']}?"
@@ -102,9 +102,9 @@ def save_data(examples: List[Dict[str, str]], output_dir: str = "./data") -> Non
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Split: 270 train, 30 val
-    train_examples = examples[:270]
-    val_examples = examples[270:]
+    # Split: 4500 train, 500 val
+    train_examples = examples[:4500]
+    val_examples = examples[4500:]
 
     # Save train.jsonl
     train_path = output_path / "train.jsonl"
