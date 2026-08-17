@@ -3,6 +3,7 @@
 import sys
 import torch
 import os
+from pathlib import Path
 from typing import Dict, Any, Tuple
 
 import structlog
@@ -230,6 +231,11 @@ class DPOTrainingPipeline:
         dpo_win_rate = self._compute_win_rate(dpo_trainer, train_dataset, tokenizer)
         log.info(f"DPO complete. Loss: {dpo_loss:.4f}, Win rate: {dpo_win_rate:.3f}")
 
+        # Save the LoRA adapter
+        log.info(f"Saving LoRA adapter to {self.output_dir}...")
+        dpo_trainer.model.save_pretrained(self.output_dir)
+        log.info(f"Adapter saved successfully")
+
         return dpo_loss, dpo_win_rate
 
     def _compute_win_rate(self, trainer, dataset, tokenizer) -> float:
@@ -284,9 +290,14 @@ class DPOTrainingPipeline:
         return win_rate
 
     def _save_adapter(self) -> None:
-        """Save adapter."""
-        os.makedirs(self.output_dir, exist_ok=True)
-        log.info(f"Adapter saved to {self.output_dir}/adapter_model.bin")
+        """Verify adapter was saved."""
+        adapter_config = Path(self.output_dir) / "adapter_config.json"
+        adapter_model = Path(self.output_dir) / "adapter_model.safetensors"
+
+        if adapter_config.exists() and adapter_model.exists():
+            log.info(f"✓ Adapter verified in {self.output_dir}")
+        else:
+            raise FileNotFoundError(f"Adapter files missing in {self.output_dir}")
 
 
 def main():
