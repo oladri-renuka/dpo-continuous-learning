@@ -16,7 +16,7 @@ log = structlog.get_logger(__name__)
 def upload_training_data(
     train_data_path: str = "./data/train.jsonl",
     val_data_path: str = "./data/val.jsonl",
-    bucket: str = "ml-artifacts",
+    bucket: str = "dpo-ml-artifacts",
     prefix: str = "preference-data/2026-08-16",
 ) -> tuple:
     """
@@ -101,7 +101,7 @@ def main():
     # Parse arguments
     train_data_path = sys.argv[1] if len(sys.argv) > 1 else "./data/train.jsonl"
     val_data_path = sys.argv[2] if len(sys.argv) > 2 else "./data/val.jsonl"
-    bucket = sys.argv[3] if len(sys.argv) > 3 else "ml-artifacts"
+    bucket = sys.argv[3] if len(sys.argv) > 3 else "dpo-ml-artifacts"
     prefix = sys.argv[4] if len(sys.argv) > 4 else "preference-data/2026-08-16"
 
     train_s3_path, val_s3_path = upload_training_data(

@@ -69,13 +69,38 @@ class DPOTrainingPipeline:
             log.error(f"Training failed: {str(e)}", exc_info=True)
             raise
 
-    def _load_data(self, s3_path: str) -> Dict:
-        """Load from S3."""
-        key = s3_path.replace("s3://dpo-ml-artifacts/", "")
-        data = self.s3_client.download_json(key)
-        examples = data.get("examples", [])
-        log.info(f"Loaded {len(examples)} examples from S3")
-        return {"examples": examples}
+    def _load_data(self, data_path: str) -> Dict:
+        """Load from S3 or local file."""
+        import json
+
+        # Try S3 first if path starts with s3://
+        if data_path.startswith("s3://"):
+            try:
+                key = data_path.replace("s3://dpo-ml-artifacts/", "")
+                data = self.s3_client.download_json(key)
+                examples = data.get("examples", [])
+                log.info(f"Loaded {len(examples)} examples from S3")
+                return {"examples": examples}
+            except Exception as e:
+                log.warning(f"S3 load failed: {str(e)}, trying local file...")
+
+        # Fall back to local file
+        try:
+            from pathlib import Path
+            local_path = Path(data_path)
+            if local_path.exists():
+                examples = []
+                with open(local_path) as f:
+                    for line in f:
+                        if line.strip():
+                            examples.append(json.loads(line))
+                log.info(f"Loaded {len(examples)} examples from local file: {local_path}")
+                return {"examples": examples}
+        except Exception as e:
+            log.error(f"Failed to load from {data_path}: {str(e)}")
+            raise
+
+        raise FileNotFoundError(f"Could not load data from {data_path}")
 
     def _evaluate_reward_model(self, val_data: Dict) -> float:
         """Evaluate reward model by checking if it can classify preferred > rejected."""

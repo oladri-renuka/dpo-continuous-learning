@@ -26,23 +26,39 @@ def load_real_dataset() -> List[Dict[str, str]]:
             if i >= 5000:  # Limit to 5000 for Phase 1
                 break
 
-            # Extract chosen and rejected from the dataset format
-            # hh-rlhf format: has "chosen" and "rejected" fields
-            prompt = item.get("prompt", "")
             chosen = item.get("chosen", "")
             rejected = item.get("rejected", "")
 
-            # Clean up format (remove \n\nHuman: / \n\nAssistant: markers if present)
-            if prompt and chosen and rejected:
-                examples.append({
-                    "prompt": prompt.strip(),
-                    "preferred": chosen.strip(),
-                    "rejected": rejected.strip(),
-                    "metadata": {
-                        "source": "anthropic/hh-rlhf",
-                        "example_id": i,
-                    }
-                })
+            if not chosen or not rejected:
+                continue
+
+            # hh-rlhf format: full conversation in chosen/rejected
+            # Format: "\n\nHuman: <question>\n\nAssistant: <response>"
+            # Extract prompt (everything up to last "Assistant:")
+            import re
+
+            # Find the last occurrence of "\n\nAssistant:"
+            chosen_parts = chosen.split("\n\nAssistant:")
+            rejected_parts = rejected.split("\n\nAssistant:")
+
+            if len(chosen_parts) >= 2 and len(rejected_parts) >= 2:
+                # Reconstruct prompt from chosen (they should have same prompt)
+                prompt = "\n\nAssistant:".join(chosen_parts[:-1]) + "\n\nAssistant:"
+                chosen_response = chosen_parts[-1].strip()
+                rejected_response = rejected_parts[-1].strip()
+
+                if prompt and chosen_response and rejected_response:
+                    examples.append(
+                        {
+                            "prompt": prompt,
+                            "preferred": chosen_response,
+                            "rejected": rejected_response,
+                            "metadata": {
+                                "source": "anthropic/hh-rlhf",
+                                "example_id": i,
+                            },
+                        }
+                    )
 
         log.info(f"Extracted {len(examples)} valid examples from dataset")
         return examples
