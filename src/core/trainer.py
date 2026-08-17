@@ -197,17 +197,18 @@ class DPOTrainingPipeline:
         }
         train_dataset = Dataset.from_dict(dataset_dict)
 
-        # DPO Config - adjusted for full dataset
+        # DPO Config - adjusted for full dataset with stable hyperparameters
         dpo_config = DPOConfig(
             output_dir=self.output_dir,
             num_train_epochs=1,
             per_device_train_batch_size=2,
             per_device_eval_batch_size=2,
-            learning_rate=5e-4,
-            beta=0.1,
+            learning_rate=1e-4,  # Lowered from 5e-4 (too aggressive)
+            beta=0.05,  # Lowered from 0.1 (KL penalty was too weak, model collapsed)
             max_length=256,
             remove_unused_columns=False,
             logging_steps=100,
+            max_grad_norm=1.0,  # Gradient clipping to prevent spikes
         )
 
         # DPO Trainer
