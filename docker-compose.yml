@@ -1,39 +1,39 @@
-version: '3.9'
-
 services:
-  # Kafka: Real-time feedback stream
-  kafka:
-    image: bitnami/kafka:latest
-    container_name: dpo-kafka
-    ports:
-      - "9092:9092"
+  # Zookeeper: Kafka coordination
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: dpo-zookeeper
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_CFG_LOG_RETENTION_HOURS: 168
-    depends_on:
-      zookeeper:
-        condition: service_healthy
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server=localhost:9092"]
+      test: ["CMD", "echo", "ruok", "|", "nc", "127.0.0.1", "2181"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - dpo-network
 
-  # Zookeeper: Kafka coordination
-  zookeeper:
-    image: bitnami/zookeeper:latest
-    container_name: dpo-zookeeper
+  # Kafka: Real-time feedback stream
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: dpo-kafka
+    ports:
+      - "9095:9092"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
     environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
     healthcheck:
-      test: ["CMD", "zkServer.sh", "status"]
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

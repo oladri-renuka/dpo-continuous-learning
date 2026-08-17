@@ -21,31 +21,52 @@ class MissingCredentialsError(Exception):
 
 
 class S3Client:
-    """S3 client with automatic retries and error handling (production only)."""
+    """S3 client with automatic retries and error handling (MinIO or AWS)."""
 
     def __init__(self, bucket: str, region: str = "us-east-1"):
         """
-        Initialize S3 client (production only).
+        Initialize S3 client (MinIO or AWS).
+
+        Uses MinIO if S3_ENDPOINT_URL is set, otherwise falls back to AWS.
 
         Args:
             bucket: S3 bucket name
             region: AWS region
 
         Raises:
-            MissingCredentialsError: If AWS credentials are not available
+            MissingCredentialsError: If credentials are not available
             S3ClientError: If S3 client initialization fails
         """
-        if not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
-            raise MissingCredentialsError(
-                "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables must be set"
-            )
-
         self.bucket = bucket
         self.region = region
 
+        # Check if using MinIO (local) or AWS
+        endpoint_url = os.getenv("S3_ENDPOINT_URL")
+        access_key = os.getenv("S3_ACCESS_KEY")
+        secret_key = os.getenv("S3_SECRET_KEY")
+
         try:
-            self.s3_client = boto3.client("s3", region_name=region)
-            log.info("S3Client initialized", bucket=bucket, region=region)
+            if endpoint_url and access_key and secret_key:
+                # MinIO configuration (local development)
+                log.info(f"Initializing MinIO client", endpoint=endpoint_url, bucket=bucket)
+                self.s3_client = boto3.client(
+                    "s3",
+                    endpoint_url=endpoint_url,
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                    region_name=region,
+                )
+            else:
+                # AWS configuration (production)
+                if not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY"):
+                    raise MissingCredentialsError(
+                        "Must set either S3_ENDPOINT_URL+S3_ACCESS_KEY+S3_SECRET_KEY (MinIO) "
+                        "or AWS_ACCESS_KEY_ID+AWS_SECRET_ACCESS_KEY (AWS)"
+                    )
+                log.info("Initializing AWS S3 client", bucket=bucket, region=region)
+                self.s3_client = boto3.client("s3", region_name=region)
+
+            log.info("✓ S3Client initialized", bucket=bucket, endpoint=endpoint_url or "AWS")
         except Exception as e:
             log.error("Failed to initialize S3 client", error=str(e))
             raise S3ClientError(f"Failed to initialize S3 client: {str(e)}") from e

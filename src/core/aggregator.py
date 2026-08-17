@@ -1,4 +1,4 @@
-"""Aggregator daemon: Consume feedback from Kafka, dedup via Redis, write to disk."""
+"""Aggregator daemon: Consume feedback from Redis, dedup via Redis, write to disk."""
 
 import hashlib
 import json
@@ -11,7 +11,6 @@ from typing import Optional
 
 import redis
 import structlog
-from confluent_kafka import Consumer, KafkaError
 from dotenv import load_dotenv
 
 log = structlog.get_logger(__name__)
@@ -19,30 +18,24 @@ log = structlog.get_logger(__name__)
 # Load environment
 load_dotenv()
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-KAFKA_TOPIC_FEEDBACK = os.getenv("KAFKA_TOPIC_FEEDBACK", "feedback.events")
-KAFKA_CONSUMER_GROUP = os.getenv("KAFKA_CONSUMER_GROUP", "dpo-aggregator")
-
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 REDIS_TTL_SECONDS = int(os.getenv("REDIS_TTL_SECONDS", "86400"))
+REDIS_CHANNEL = "feedback_events"
 
 DATA_RAW_DIR = Path(os.getenv("DATA_RAW_DIR", "./data/raw"))
 PIPELINE_FEEDBACK_THRESHOLD = int(os.getenv("PIPELINE_FEEDBACK_THRESHOLD", "500"))
 
 
 class FeedbackAggregator:
-    """Consume feedback events, dedup, and trigger pipeline."""
+    """Consume feedback events via Redis pub/sub, dedup, and trigger pipeline."""
 
     def __init__(self):
         self.data_raw_dir = DATA_RAW_DIR
         self.data_raw_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize Kafka consumer
-        self.kafka_consumer = self._init_kafka_consumer()
-
-        # Initialize Redis for deduplication
+        # Initialize Redis for pub/sub and deduplication
         self.redis_client = self._init_redis()
 
         # Track current day's file and message count
@@ -51,29 +44,10 @@ class FeedbackAggregator:
         self.message_count = 0
 
         log.info(f"FeedbackAggregator initialized")
-        log.info(f"  Kafka: {KAFKA_BOOTSTRAP_SERVERS} (topic: {KAFKA_TOPIC_FEEDBACK})")
         log.info(f"  Redis: {REDIS_HOST}:{REDIS_PORT}")
+        log.info(f"  Channel: {REDIS_CHANNEL}")
         log.info(f"  Data dir: {self.data_raw_dir}")
         log.info(f"  Threshold: {PIPELINE_FEEDBACK_THRESHOLD} messages")
-
-    def _init_kafka_consumer(self) -> Consumer:
-        """Initialize real Kafka consumer."""
-        config = {
-            "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
-            "group.id": KAFKA_CONSUMER_GROUP,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": True,
-            "session.timeout.ms": 6000,
-        }
-
-        try:
-            consumer = Consumer(config)
-            log.info(f"✓ Kafka consumer created")
-            return consumer
-        except Exception as e:
-            log.error(f"Failed to create Kafka consumer: {str(e)}")
-            log.error(f"Is Kafka running at {KAFKA_BOOTSTRAP_SERVERS}?")
-            raise
 
     def _init_redis(self) -> redis.Redis:
         """Initialize real Redis client."""
@@ -149,13 +123,17 @@ class FeedbackAggregator:
         log.info("=" * 80)
 
         try:
-            # Call orchestrator in subprocess
+            # Call orchestrator in subprocess with proper Python path
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(Path.cwd())
+
             result = subprocess.run(
                 ["python", "scripts/run_pipeline.py"],
                 check=True,
                 capture_output=True,
                 text=True,
                 timeout=3600,  # 1 hour timeout
+                env=env,
             )
             log.info(f"Pipeline completed successfully")
             log.info(f"Output: {result.stdout}")
@@ -173,35 +151,24 @@ class FeedbackAggregator:
             log.error(f"Failed to trigger pipeline: {str(e)}")
 
     def run(self) -> None:
-        """Run daemon: consume Kafka, dedup, write, and trigger pipeline."""
+        """Run daemon: consume Redis, dedup, write, and trigger pipeline."""
         log.info("=" * 80)
         log.info("AGGREGATOR DAEMON STARTED")
         log.info("=" * 80)
-        log.info(f"Subscribing to topic: {KAFKA_TOPIC_FEEDBACK}")
+        log.info(f"Listening on channel: {REDIS_CHANNEL}")
 
-        # Subscribe to Kafka topic
-        self.kafka_consumer.subscribe([KAFKA_TOPIC_FEEDBACK])
+        # Subscribe to Redis channel
+        pubsub = self.redis_client.pubsub()
+        pubsub.subscribe(REDIS_CHANNEL)
 
         try:
-            while True:
-                # Poll for messages (timeout 5s)
-                msg = self.kafka_consumer.poll(timeout=5)
-
-                if msg is None:
-                    # Timeout, no messages
+            for message in pubsub.listen():
+                # Skip subscription confirmation messages
+                if message["type"] != "message":
                     continue
 
-                if msg.error():
-                    if msg.error().code() == KafkaError._PARTITION_EOF:
-                        # End of partition
-                        continue
-                    else:
-                        log.error(f"Kafka error: {msg.error()}")
-                        raise Exception(f"Kafka error: {msg.error()}")
-
-                # Process message
                 try:
-                    feedback = json.loads(msg.value().decode("utf-8"))
+                    feedback = json.loads(message["data"])
                     log.debug(f"Received feedback: user={feedback.get('user_id')}")
 
                     # Check for duplicates
@@ -226,7 +193,7 @@ class FeedbackAggregator:
         except KeyboardInterrupt:
             log.info("Shutting down (Ctrl+C)...")
         finally:
-            self.kafka_consumer.close()
+            pubsub.close()
             self.redis_client.close()
             log.info("Aggregator daemon stopped")
 

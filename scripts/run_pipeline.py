@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -36,18 +37,29 @@ class Orchestrator:
         self.data_processed_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Import at runtime to avoid hard dependency
+        # Initialize S3 client (required)
         try:
             from src.infra.s3_client import S3Client
-            from src.infra.runpod_client import RunPodClient
-
             self.s3_client = S3Client(bucket=S3_BUCKET)
-            self.runpod_client = RunPodClient()
         except Exception as e:
-            log.error(f"Failed to initialize clients: {str(e)}")
+            log.error(f"Failed to initialize S3 client: {str(e)}")
             raise
 
-        log.info("Orchestrator initialized")
+        # Initialize RunPod client (optional - fall back to local training)
+        self.runpod_client = None
+        self.use_runpod = False
+        try:
+            if os.getenv("RUNPOD_API_KEY", "").startswith("your_"):
+                log.warning("RunPod API key not configured (placeholder detected). Using local training.")
+            else:
+                from src.infra.runpod_client import RunPodClient
+                self.runpod_client = RunPodClient()
+                self.use_runpod = True
+                log.info("RunPod client initialized")
+        except Exception as e:
+            log.warning(f"RunPod not available, falling back to local training: {str(e)}")
+
+        log.info("Orchestrator initialized", use_runpod=self.use_runpod)
 
     def _get_latest_raw_file(self) -> Path:
         """Get the most recent raw feedback file."""
@@ -120,57 +132,94 @@ class Orchestrator:
             raise
 
     def _submit_training_job(self, train_s3_path: str, val_s3_path: str) -> str:
-        """Submit training job to RunPod."""
+        """Submit training job to RunPod or run locally."""
         log.info("=" * 80)
-        log.info("Submitting training job to RunPod...")
+        if self.use_runpod:
+            log.info("Submitting training job to RunPod...")
+        else:
+            log.info("Running training job locally...")
         log.info("=" * 80)
-
-        command = f"python -m src.core.trainer {train_s3_path} {val_s3_path}"
 
         try:
-            job_id = self.runpod_client.submit_training_job(
-                command=command,
-                input_data={"train_data": train_s3_path, "val_data": val_s3_path},
-            )
-            log.info(f"✓ Job submitted: {job_id}")
-            return job_id
+            if self.use_runpod:
+                # Submit to RunPod (Phase 2+)
+                command = f"python -m src.core.trainer {train_s3_path} {val_s3_path}"
+                job_id = self.runpod_client.submit_job(
+                    endpoint_id=os.getenv("RUNPOD_ENDPOINT_ID", "unknown"),
+                    input_data={"train_data": train_s3_path, "val_data": val_s3_path},
+                )
+                log.info(f"✓ RunPod job submitted: {job_id}")
+                return job_id
+            else:
+                # Run locally (Phase 1: testing)
+                log.info("Running trainer locally via subprocess...")
+                local_job_id = str(uuid.uuid4())[:8]
+
+                env = os.environ.copy()
+                env["PYTHONPATH"] = str(Path.cwd())
+
+                result = subprocess.run(
+                    ["python", "-m", "src.core.trainer", train_s3_path, val_s3_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=7200,  # 2 hours
+                    env=env,
+                )
+
+                if result.returncode != 0:
+                    log.error(f"Local training failed: {result.stderr}")
+                    raise Exception(f"Training failed: {result.stderr}")
+
+                log.info(f"✓ Local training completed (job_id: {local_job_id})")
+                log.info(f"Output: {result.stdout}")
+                return local_job_id
+
         except Exception as e:
             log.error(f"Failed to submit training job: {str(e)}")
             raise
 
     def _wait_for_training(self, job_id: str, timeout_seconds: int = 3600) -> dict:
-        """Poll RunPod API until job completes."""
-        log.info(f"Polling RunPod job {job_id} every {RUNPOD_POLL_INTERVAL}s...")
+        """Wait for training job (RunPod or local)."""
+        if self.use_runpod:
+            # Poll RunPod API until job completes
+            log.info(f"Polling RunPod job {job_id} every {RUNPOD_POLL_INTERVAL}s...")
 
-        start_time = time.time()
-        while True:
-            elapsed = time.time() - start_time
+            start_time = time.time()
+            while True:
+                elapsed = time.time() - start_time
 
-            # Timeout check
-            if elapsed > timeout_seconds:
-                log.error(f"Job timed out after {elapsed:.0f}s")
-                raise TimeoutError(f"Training job {job_id} timed out")
+                # Timeout check
+                if elapsed > timeout_seconds:
+                    log.error(f"Job timed out after {elapsed:.0f}s")
+                    raise TimeoutError(f"Training job {job_id} timed out")
 
-            try:
-                # Poll job status
-                result = self.runpod_client.get_job_status(job_id)
+                try:
+                    # Poll job status
+                    result = self.runpod_client.poll_job(
+                        endpoint_id=os.getenv("RUNPOD_ENDPOINT_ID", "unknown"),
+                        job_id=job_id,
+                    )
 
-                if result["status"] == "COMPLETED":
-                    log.info(f"✓ Job completed successfully")
-                    return result
+                    if result["status"] == "COMPLETED":
+                        log.info(f"✓ Job completed successfully")
+                        return result
 
-                elif result["status"] == "FAILED":
-                    log.error(f"✗ Job failed: {result.get('error', 'Unknown error')}")
-                    raise Exception(f"Training job failed: {result}")
+                    elif result["status"] == "FAILED":
+                        log.error(f"✗ Job failed")
+                        raise Exception(f"Training job failed: {result}")
 
-                else:
-                    log.debug(f"Status: {result['status']} (elapsed: {elapsed:.0f}s)")
+                    else:
+                        log.debug(f"Status: {result.get('status')} (elapsed: {elapsed:.0f}s)")
 
-            except Exception as e:
-                log.error(f"Error polling job status: {str(e)}")
+                except Exception as e:
+                    log.error(f"Error polling job status: {str(e)}")
 
-            # Wait before next poll
-            time.sleep(RUNPOD_POLL_INTERVAL)
+                # Wait before next poll
+                time.sleep(RUNPOD_POLL_INTERVAL)
+        else:
+            # Local training is synchronous, so job already completed in _submit_training_job
+            log.info(f"Local training already completed (no polling needed)")
+            return {"status": "COMPLETED", "job_id": job_id}
 
     def _download_adapter(self, job_id: str) -> Path:
         """Download trained adapter from S3 to local disk."""
