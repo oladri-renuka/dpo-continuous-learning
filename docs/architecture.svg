@@ -1,4 +1,4 @@
-<svg viewBox="0 0 1600 950" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1600 750" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
       <polygon points="0 0, 10 3, 0 6" fill="#000"/>
@@ -7,119 +7,116 @@
 
   <style>
     .box { fill: #fff; stroke: #000; stroke-width: 2; }
-    .title { font-size: 14px; font-weight: bold; }
-    .text { font-size: 11px; }
+    .title { font-size: 13px; font-weight: bold; }
+    .text { font-size: 10px; }
     .arrow { stroke: #000; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    .label { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
   </style>
 
   <!-- Title -->
-  <text x="800" y="35" text-anchor="middle" style="font-size: 22px; font-weight: bold;">DPO Continuous Learning Pipeline</text>
+  <text x="800" y="30" text-anchor="middle" style="font-size: 24px; font-weight: bold;">DPO Continuous Learning Pipeline</text>
 
-  <!-- Row 1: Input to Aggregation -->
-  <text x="50" y="80" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Input</text>
-  <rect class="box" x="50" y="90" width="120" height="100"/>
-  <text x="110" y="120" text-anchor="middle" class="title">User Feedback</text>
-  <text x="110" y="140" text-anchor="middle" class="text">preference pairs</text>
-  <text x="110" y="155" text-anchor="middle" class="text">thumbs up/down</text>
+  <!-- TOP ROW: INPUT → MESSAGE QUEUE → AGGREGATION -->
+  <text x="65" y="70" class="label">INPUT</text>
+  <rect class="box" x="50" y="80" width="130" height="90"/>
+  <text x="115" y="110" text-anchor="middle" class="title">User Feedback</text>
+  <text x="115" y="128" text-anchor="middle" class="text">preference pairs</text>
+  <text x="115" y="143" text-anchor="middle" class="text">thumbs up/down</text>
 
-  <path class="arrow" d="M 170 140 L 210 140"/>
+  <path class="arrow" d="M 180 125 L 220 125"/>
 
-  <text x="220" y="80" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Message Queue</text>
-  <rect class="box" x="210" y="90" width="120" height="100"/>
-  <text x="270" y="120" text-anchor="middle" class="title">Redis Pub/Sub</text>
-  <text x="270" y="140" text-anchor="middle" class="text">feedback_events</text>
-  <text x="270" y="155" text-anchor="middle" class="text">24h TTL</text>
+  <text x="240" y="70" class="label">MESSAGE QUEUE</text>
+  <rect class="box" x="220" y="80" width="130" height="90"/>
+  <text x="285" y="110" text-anchor="middle" class="title">Redis Pub/Sub</text>
+  <text x="285" y="128" text-anchor="middle" class="text">feedback_events</text>
+  <text x="285" y="143" text-anchor="middle" class="text">24h TTL</text>
 
-  <path class="arrow" d="M 330 140 L 370 140"/>
+  <path class="arrow" d="M 350 125 L 390 125"/>
 
-  <text x="380" y="80" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Aggregation</text>
-  <rect class="box" x="370" y="90" width="130" height="100"/>
-  <text x="435" y="120" text-anchor="middle" class="title">Aggregator</text>
-  <text x="435" y="140" text-anchor="middle" class="text">SHA256 dedup</text>
-  <text x="435" y="155" text-anchor="middle" class="text">write JSONL</text>
+  <text x="410" y="70" class="label">AGGREGATION</text>
+  <rect class="box" x="390" y="80" width="130" height="90"/>
+  <text x="455" y="110" text-anchor="middle" class="title">Aggregator</text>
+  <text x="455" y="128" text-anchor="middle" class="text">SHA256 dedup</text>
+  <text x="455" y="143" text-anchor="middle" class="text">write JSONL</text>
 
-  <!-- Arrow down -->
-  <path class="arrow" d="M 435 190 L 435 250"/>
+  <!-- ARROW DOWN FROM AGGREGATOR -->
+  <path class="arrow" d="M 455 170 L 455 230"/>
 
-  <!-- Row 2: Processing -->
-  <text x="370" y="250" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Storage</text>
-  <rect class="box" x="370" y="260" width="130" height="100"/>
-  <text x="435" y="290" text-anchor="middle" class="title">data/raw/</text>
-  <text x="435" y="310" text-anchor="middle" class="text">daily JSONL</text>
-  <text x="435" y="325" text-anchor="middle" class="text">≥500 messages</text>
+  <!-- MIDDLE ROW: STORAGE → ORCHESTRATION → TRAINING DATA → TRAINING -->
+  <text x="410" y="230" class="label">STORAGE</text>
+  <rect class="box" x="390" y="240" width="130" height="90"/>
+  <text x="455" y="270" text-anchor="middle" class="title">data/raw/</text>
+  <text x="455" y="288" text-anchor="middle" class="text">daily JSONL</text>
+  <text x="455" y="303" text-anchor="middle" class="text">≥500 messages</text>
 
-  <path class="arrow" d="M 500 310 L 540 310"/>
+  <path class="arrow" d="M 520 285 L 560 285"/>
 
-  <text x="550" y="250" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Orchestration</text>
-  <rect class="box" x="540" y="260" width="130" height="100"/>
-  <text x="605" y="290" text-anchor="middle" class="title">Orchestrator</text>
-  <text x="605" y="310" text-anchor="middle" class="text">dedup + split</text>
-  <text x="605" y="325" text-anchor="middle" class="text">90/10 train/val</text>
+  <text x="580" y="230" class="label">ORCHESTRATION</text>
+  <rect class="box" x="560" y="240" width="130" height="90"/>
+  <text x="625" y="270" text-anchor="middle" class="title">Orchestrator</text>
+  <text x="625" y="288" text-anchor="middle" class="text">dedup + split</text>
+  <text x="625" y="303" text-anchor="middle" class="text">90/10 train/val</text>
 
-  <path class="arrow" d="M 670 310 L 710 310"/>
+  <path class="arrow" d="M 690 285 L 730 285"/>
 
-  <text x="720" y="250" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Training Data</text>
-  <rect class="box" x="710" y="260" width="130" height="100"/>
-  <text x="775" y="290" text-anchor="middle" class="title">MinIO S3</text>
-  <text x="775" y="310" text-anchor="middle" class="text">train.jsonl</text>
-  <text x="775" y="325" text-anchor="middle" class="text">val.jsonl</text>
+  <text x="750" y="230" class="label">TRAINING DATA</text>
+  <rect class="box" x="730" y="240" width="130" height="90"/>
+  <text x="795" y="270" text-anchor="middle" class="title">MinIO S3</text>
+  <text x="795" y="288" text-anchor="middle" class="text">train.jsonl</text>
+  <text x="795" y="303" text-anchor="middle" class="text">val.jsonl</text>
 
-  <path class="arrow" d="M 840 310 L 880 310"/>
+  <path class="arrow" d="M 860 285 L 900 285"/>
 
-  <text x="890" y="250" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Training</text>
-  <rect class="box" x="880" y="260" width="130" height="100"/>
-  <text x="945" y="290" text-anchor="middle" class="title">Trainer</text>
-  <text x="945" y="310" text-anchor="middle" class="text">Llama-2-7B</text>
-  <text x="945" y="325" text-anchor="middle" class="text">QLoRA + DPO</text>
+  <text x="920" y="230" class="label">TRAINING</text>
+  <rect class="box" x="900" y="240" width="130" height="90"/>
+  <text x="965" y="270" text-anchor="middle" class="title">Trainer</text>
+  <text x="965" y="288" text-anchor="middle" class="text">Llama-2-7B</text>
+  <text x="965" y="303" text-anchor="middle" class="text">QLoRA + DPO</text>
 
-  <!-- Arrow down to Quality Gate -->
-  <path class="arrow" d="M 945 360 L 945 420"/>
+  <!-- ARROW DOWN FROM TRAINER TO QUALITY GATE -->
+  <path class="arrow" d="M 965 330 L 965 390"/>
 
-  <!-- Row 3: Validation & Deployment -->
-  <text x="1080" y="420" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Validation</text>
-  <rect class="box" x="1070" y="430" width="130" height="120" style="fill: #ffe8e8;"/>
-  <text x="1135" y="465" text-anchor="middle" class="title">Quality Gate</text>
-  <text x="1135" y="485" text-anchor="middle" class="text">Accuracy ≥ 72%</text>
-  <text x="1135" y="500" text-anchor="middle" class="text">Win-Rate ≥ 55%</text>
-  <text x="1135" y="515" text-anchor="middle" style="font-size: 10px;">hard gates</text>
+  <!-- BOTTOM ROW: QUALITY GATE, DEPLOYMENT -->
+  <text x="1000" y="390" class="label">VALIDATION</text>
+  <rect class="box" x="900" y="400" width="130" height="110" style="fill: #ffe8e8;"/>
+  <text x="965" y="435" text-anchor="middle" class="title">Quality Gate</text>
+  <text x="965" y="453" text-anchor="middle" class="text">Accuracy ≥ 72%</text>
+  <text x="965" y="468" text-anchor="middle" class="text">Win-Rate ≥ 55%</text>
 
-  <!-- Pass arrow left -->
-  <path class="arrow" d="M 1070 485 L 1000 485"/>
-  <text x="1025" y="480" style="font-size: 10px; font-weight: bold;">PASS</text>
+  <!-- PASS ARROW LEFT -->
+  <path class="arrow" d="M 900 455 L 840 455"/>
+  <text x="860" y="450" style="font-size: 10px; font-weight: bold;">PASS</text>
 
-  <!-- Fail arrow down -->
-  <path class="arrow" d="M 945 480 L 945 540"/>
-  <text x="955" y="515" style="font-size: 10px; font-weight: bold;">FAIL</text>
+  <!-- FAIL ARROW DOWN -->
+  <path class="arrow" d="M 965 510 L 965 570"/>
+  <text x="975" y="545" style="font-size: 10px; font-weight: bold;">FAIL</text>
 
-  <text x="890" y="420" style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Deployment</text>
-  <rect class="box" x="880" y="430" width="130" height="120" style="fill: #e8f5e9;"/>
-  <text x="945" y="465" text-anchor="middle" class="title">S3 Champion</text>
-  <text x="945" y="485" text-anchor="middle" class="text">adapter model</text>
-  <text x="945" y="500" text-anchor="middle" class="text">checkpoint</text>
-  <text x="945" y="515" text-anchor="middle" style="font-size: 10px;">ready to serve</text>
+  <text x="750" y="390" class="label">DEPLOYMENT</text>
+  <rect class="box" x="730" y="400" width="130" height="110"/>
+  <text x="795" y="435" text-anchor="middle" class="title">S3 Champion</text>
+  <text x="795" y="453" text-anchor="middle" class="text">adapter model</text>
+  <text x="795" y="468" text-anchor="middle" class="text">checkpoint</text>
 
-  <!-- Exit on failure -->
-  <rect class="box" x="880" y="540" width="130" height="100" style="fill: #ffcccc; stroke: #c62828; stroke-width: 2;"/>
-  <text x="945" y="570" text-anchor="middle" class="title" style="fill: #c62828;">Exit Code 1</text>
-  <text x="945" y="590" text-anchor="middle" class="text" style="fill: #c62828;">Pipeline Halts</text>
-  <text x="945" y="605" text-anchor="middle" class="text" style="fill: #c62828; font-size: 9px;">No Deployment</text>
+  <path class="arrow" d="M 730 455 L 670 455"/>
 
-  <!-- Bottom Info Box -->
-  <rect x="50" y="680" width="1500" height="250" fill="#f9f9f9" stroke="#ddd" stroke-width="1"/>
+  <rect class="box" x="550" y="400" width="120" height="110"/>
+  <text x="610" y="435" text-anchor="middle" class="title">API Server</text>
+  <text x="610" y="453" text-anchor="middle" class="text">FastAPI</text>
+  <text x="610" y="468" text-anchor="middle" class="text">inference</text>
 
-  <text x="70" y="705" style="font-size: 13px; font-weight: bold;">REAL SERVICES:</text>
+  <!-- EXIT ON FAIL -->
+  <rect class="box" x="900" y="570" width="130" height="90" style="fill: #ffcccc; stroke: #c62828; stroke-width: 2;"/>
+  <text x="965" y="600" text-anchor="middle" class="title" style="fill: #c62828;">Exit Code 1</text>
+  <text x="965" y="618" text-anchor="middle" class="text" style="fill: #c62828;">Pipeline Halts</text>
+  <text x="965" y="633" text-anchor="middle" class="text" style="fill: #c62828; font-size: 9px;">No Deployment</text>
 
-  <text x="70" y="730" style="font-size: 11px; font-weight: 600;">Redis pub/sub</text>
-  <text x="70" y="750" class="text">Real-time feedback events with 24-hour TTL deduplication using SHA256 hashing</text>
+  <!-- INFO SECTION -->
+  <rect x="50" y="685" width="1500" height="55" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
 
-  <text x="500" y="730" style="font-size: 11px; font-weight: 600;">MinIO S3 Storage</text>
-  <text x="500" y="750" class="text">Training datasets, trained adapters, model checkpoints</text>
+  <text x="70" y="705" style="font-size: 11px; font-weight: bold;">REAL SERVICES:</text>
+  <text x="70" y="722" class="text">Redis pub/sub     •     MinIO S3 Storage     •     Llama-2-7B (CUDA/CPU)</text>
+  <text x="70" y="734" class="text">Real-time feedback events with 24-hour TTL deduplication using SHA256 hashing  Training datasets, trained adapters, model checkpoints  QLoRA (rank 16, alpha 32) + DPO training on real data</text>
 
-  <text x="1050" y="730" style="font-size: 11px; font-weight: 600;">Llama-2-7B (CUDA/CPU)</text>
-  <text x="1050" y="750" class="text">QLoRA (rank 16, alpha 32) + DPO training on real data</text>
-
-  <text x="70" y="780" style="font-size: 13px; font-weight: bold;">COMPLETE FLOW:</text>
-  <text x="70" y="800" class="text">User Feedback → Redis Queue → Aggregator (dedup/write) → ≥500 msgs → Orchestrator (split/upload) → Trainer (QLoRA+DPO) → Quality Gate (validate) → S3 Champion → API Server → /predict</text>
-
-  <text x="70" y="870" style="font-size: 11px; font-style: italic; fill: #999;">No mocks. Real services: Redis, MinIO/S3, Llama-2-7B. Real data: Anthropic/hh-rlhf. Hard quality gates with no bypass.</text>
+  <text x="70" y="750" style="font-size: 11px; font-weight: bold;">COMPLETE FLOW:</text>
+  <text x="70" y="765" class="text">User Feedback → Redis Queue → Aggregator (dedup/write) → ≥500 msgs → Orchestrator (split/upload) → Trainer (QLoRA+DPO) → Quality Gate (validate) → S3 Champion → API Server → /predict</text>
 </svg>
