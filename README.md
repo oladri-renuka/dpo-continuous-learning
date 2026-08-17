@@ -14,7 +14,19 @@ Feedback-driven LLM alignment system. Collects preference data, trains LoRA adap
 
 ## Architecture
 
-![Pipeline Architecture](docs/architecture.svg)
+```mermaid
+graph LR
+    A["User Feedback"] -->|Redis Pub/Sub| B["Aggregator"]
+    B -->|SHA256 Dedup| C["data/raw/"]
+    C -->|≥500 msgs| D["Orchestrator"]
+    D -->|90/10 split| E["MinIO S3"]
+    E -->|train/val| F["Trainer"]
+    F -->|QLoRA+DPO| G["Quality Gate"]
+    G -->|Acc≥72%<br/>Win≥55%| H["S3 Champion"]
+    G -->|FAIL| I["Exit Code 1"]
+    H -->|load| J["API Server"]
+    J -->|/predict| K["Inference"]
+```
 
 ## Core Components
 
