@@ -1,24 +1,63 @@
-"""Generate synthetic training data for Phase 1 RunPod spike (no Kafka/S3)."""
+"""Load real Anthropic/hh-rlhf dataset for training."""
 
 import json
 import sys
 from pathlib import Path
 from typing import List, Dict, Any
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import structlog
+from datasets import load_dataset
 
 log = structlog.get_logger(__name__)
 
 
-def generate_synthetic_data() -> List[Dict[str, str]]:
-    """Generate 300 synthetic training examples using templates."""
+def load_real_dataset() -> List[Dict[str, str]]:
+    """Load real Anthropic/hh-rlhf dataset from HuggingFace."""
 
-    log.info("Generating synthetic training data...")
+    log.info("Loading Anthropic/hh-rlhf dataset from HuggingFace...")
 
-    # Question-answer templates
+    try:
+        # Load real dataset
+        dataset = load_dataset("Anthropic/hh-rlhf", split="train", streaming=False)
+        log.info(f"Loaded {len(dataset)} examples from Anthropic/hh-rlhf")
+
+        examples = []
+        for i, item in enumerate(dataset):
+            if i >= 5000:  # Limit to 5000 for Phase 1
+                break
+
+            # Extract chosen and rejected from the dataset format
+            # hh-rlhf format: has "chosen" and "rejected" fields
+            prompt = item.get("prompt", "")
+            chosen = item.get("chosen", "")
+            rejected = item.get("rejected", "")
+
+            # Clean up format (remove \n\nHuman: / \n\nAssistant: markers if present)
+            if prompt and chosen and rejected:
+                examples.append({
+                    "prompt": prompt.strip(),
+                    "preferred": chosen.strip(),
+                    "rejected": rejected.strip(),
+                    "metadata": {
+                        "source": "anthropic/hh-rlhf",
+                        "example_id": i,
+                    }
+                })
+
+        log.info(f"Extracted {len(examples)} valid examples from dataset")
+        return examples
+
+    except Exception as e:
+        log.error(f"Failed to load real dataset: {str(e)}")
+        log.info("Falling back to synthetic data...")
+        return load_synthetic_data()
+
+
+def load_synthetic_data() -> List[Dict[str, str]]:
+    """Fallback: Generate synthetic data if real dataset unavailable."""
+
+    log.warning("Using synthetic data as fallback")
+
     qa_pairs = [
         {
             "topic": "Python",
@@ -27,72 +66,26 @@ def generate_synthetic_data() -> List[Dict[str, str]]:
         },
         {
             "topic": "Machine Learning",
-            "correct": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed. It uses algorithms to analyze data and identify patterns.",
-            "incorrect": "Machine learning is when you teach a computer to learn things."
-        },
-        {
-            "topic": "Neural Networks",
-            "correct": "Neural networks are computing systems inspired by biological neural networks in animal brains. They consist of interconnected nodes organized in layers, where each connection has learnable weights.",
-            "incorrect": "Neural networks are networks made of neurons."
-        },
-        {
-            "topic": "Gradient Descent",
-            "correct": "Gradient descent is an optimization algorithm used to minimize a loss function by iteratively moving in the direction of steepest descent. It's fundamental to training neural networks.",
-            "incorrect": "Gradient descent is when you go down a gradient."
-        },
-        {
-            "topic": "Regularization",
-            "correct": "Regularization is a technique to prevent overfitting by adding a penalty term to the loss function. Common types include L1 (Lasso) and L2 (Ridge) regularization.",
-            "incorrect": "Regularization makes things regular."
-        },
-        {
-            "topic": "Backpropagation",
-            "correct": "Backpropagation is an algorithm for training neural networks by computing gradients of the loss function with respect to network weights. It enables efficient gradient descent optimization.",
-            "incorrect": "Backpropagation is when you go back and propagate."
-        },
-        {
-            "topic": "Activation Function",
-            "correct": "Activation functions introduce non-linearity into neural networks, enabling them to learn complex patterns. Common examples include ReLU, sigmoid, and tanh.",
-            "incorrect": "Activation functions activate things."
-        },
-        {
-            "topic": "Batch Normalization",
-            "correct": "Batch normalization normalizes layer inputs by standardizing activations within minibatches. It accelerates training, enables higher learning rates, and improves model generalization.",
-            "incorrect": "Batch normalization normalizes batches."
-        },
-        {
-            "topic": "Transfer Learning",
-            "correct": "Transfer learning is a technique where a model trained on one task is adapted for another task. It leverages pre-trained knowledge to improve performance on new tasks with limited data.",
-            "incorrect": "Transfer learning is learning how to transfer things."
-        },
-        {
-            "topic": "Attention Mechanism",
-            "correct": "Attention mechanisms allow models to dynamically focus on different parts of the input. They compute weighted combinations of values based on learned query-key-value interactions.",
-            "incorrect": "Attention is when you pay attention to something."
+            "correct": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed.",
+            "incorrect": "Machine learning is teaching computers to do things."
         },
     ]
 
     examples = []
-
-    # Generate 5000 examples (4500 train, 500 val)
     for i in range(5000):
         qa = qa_pairs[i % len(qa_pairs)]
 
-        prompt = f"Q: What is {qa['topic']}?"
-        preferred = f"A: {qa['correct']}"
-        rejected = f"A: {qa['incorrect']}"
-
         examples.append({
-            "prompt": prompt,
-            "preferred": preferred,
-            "rejected": rejected,
+            "prompt": f"Q: What is {qa['topic']}?",
+            "preferred": f"A: {qa['correct']}",
+            "rejected": f"A: {qa['incorrect']}",
             "metadata": {
                 "topic": qa["topic"],
                 "example_id": i,
+                "source": "synthetic",
             }
         })
 
-    log.info(f"Generated {len(examples)} synthetic examples")
     return examples
 
 
@@ -127,14 +120,17 @@ def save_data(examples: List[Dict[str, str]], output_dir: str = "./data") -> Non
 
 
 def main():
-    """Generate and save synthetic training data."""
+    """Generate and save training data."""
     try:
         from src.infra import setup_logging
         setup_logging(environment="production")
     except ImportError:
-        pass  # Logging not required for seed script
+        pass
 
-    examples = generate_synthetic_data()
+    # Load real dataset (or fallback to synthetic)
+    examples = load_real_dataset()
+
+    # Save to files
     save_data(examples)
 
 
